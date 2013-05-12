@@ -6,13 +6,17 @@ template <typename T>
 class Sphere
 {
 public:
-    Sphere(const Vec3<T> &c, const T &r, const Vec3<T> &clr) : 
-		m_center(c), m_radius(r), m_color(clr)
+    Sphere(const Vec3<T> &c, const T &r, const Vec3<T> &clr,
+           const T &reflection = T(0)) :
+		m_center(c), m_radius(r), m_color(clr),
+        m_reflection(reflection)
 	{}
 
     Vec3<T> center() const { return m_center; }
     T       radius() const { return m_radius; }
     Vec3<T> color()  const { return m_color;  }
+
+    T       reflection() const { return m_reflection; }
 
     Vec3<T> normal(const Vec3<T>& point) const
     {
@@ -40,6 +44,8 @@ protected:
     Vec3<T> m_center;
     T       m_radius;
     Vec3<T> m_color;
+    T       m_reflection;
+    T       m_transparency;
 };
 
 template <typename T>

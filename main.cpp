@@ -9,6 +9,7 @@ const static unsigned width = 1280;
 const static unsigned height = 720;
 const static float fov = 45;
 const static float pi = 3.1415926536;
+const static unsigned max_depth = 6;
 
 SDL_Surface *screen;
 
@@ -81,6 +82,13 @@ Vec3<T> trace(const Ray<T>& ray, const C& scene, const L& lights, const int &dep
             color += l.color() * std::max(normal.dot(light_direction), T(0)) * sphere->color();
     }
 
+    // compute reflection
+    if (sphere->reflection() > 0 && depth < max_depth)
+    {
+        Vec3<T> refldir = ray.direction - normal * 2 * ray.direction.dot(normal);
+        Vec3<T> reflection = trace(Ray<float>(point_of_hit + normal * offset, refldir), scene, lights, depth + 1);
+        color += reflection * sphere->reflection();
+    }
 	return color;
 }
 
@@ -150,9 +158,9 @@ int main(int argc, char *argv[])
     
     // add objects
 	scene.emplace_back(Sphere<float>({0, -10004, -20}, 10000, {0.2, 0.2, 0.2}));
-	scene.emplace_back(Sphere<float>({0, 0, -20},      4,     {1.0, 0.3, 0.3}));
-	scene.emplace_back(Sphere<float>({5, -1, -15},     2,     {0.9, 0.7, 0.5}));
-	scene.emplace_back(Sphere<float>({-5, -1, -15},    2,     {0.8, 0.7, 0.9}));
+	scene.emplace_back(Sphere<float>({0, 0, -20},      4,     {1.0, 0.3, 0.3}, .5));
+	scene.emplace_back(Sphere<float>({5, -1, -15},     2,     {0.9, 0.7, 0.5}, .3));
+	scene.emplace_back(Sphere<float>({-5, -1, -15},    2,     {0.8, 0.7, 0.9}, .3));
     // add lights
     lights.emplace_back(Light<float>({-10, 20, 30},  {1, 1, 1}));
     

@@ -25,15 +25,15 @@ public:
     
 	bool intersect(const Vec3<T>& origin, const Vec3<T>& direction, T* near = NULL, T* far = NULL) const
 	{
-		Vec3<T> l = center() - origin;
-		T a = l.dot(direction);
+		auto l = center() - origin;
+		auto a = l.dot(direction);
 		if (a < 0)              // opposite direction
             return false;
-		T b2 = l.dot(l) - a * a;
-        T r2 = radius() * radius();
+        auto b2 = l.dot(l) - a * a;
+        auto r2 = radius() * radius();
 		if (b2 > r2)            // perpendicular > r
             return false;
-		T c = sqrt(r2 - b2);
+        auto c = sqrt(r2 - b2);
 		if (near)
             *near = a - c;
         if (far)

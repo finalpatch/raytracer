@@ -1,51 +1,62 @@
 #pragma once
 
 #include "vecmat.h"
+#include "material.h"
+
+template <typename T>
+struct Ray
+{
+    Vec3<T> start;
+    Vec3<T> dir;
+
+    Ray(const Vec3<T>& _start, const Vec3<T>& _dir) :
+        start(_start), dir(_dir)
+    {}
+};
 
 template <typename T>
 class Sphere
 {
 public:
-    Sphere(const Vec3<T> &c, const T &r, const Vec3<T> &clr,
-           const T &reflection = T(0)) :
-		m_center(c), m_radius(r), m_color(clr),
-        m_reflection(reflection)
+    Sphere(const Vec3<T> &c, const T &r, const Material<T>& m) :
+		m_center(c), m_radius(r), m_material(m)
 	{}
 
-    Vec3<T> center() const { return m_center; }
-    T       radius() const { return m_radius; }
-    Vec3<T> color()  const { return m_color;  }
-
-    T       reflection() const { return m_reflection; }
-
-    Vec3<T> normal(const Vec3<T>& point) const
+    Vec3<T> normal(const Vec3<T>& pos) const
     {
-        return (point - center()).normalized();
+        return (pos - m_center).normalized();
     }
     
-	bool intersect(const Vec3<T>& origin, const Vec3<T>& direction, T* near = NULL, T* far = NULL) const
+	bool intersect(const Ray<T>& ray, T* distance = NULL) const
 	{
-		auto l = center() - origin;
-		auto a = l.dot(direction);
+		auto l = m_center - ray.start;
+		auto a = l.dot(ray.dir);
 		if (a < 0)              // opposite direction
             return false;
         auto b2 = l.dot(l) - a * a;
-        auto r2 = radius() * radius();
+        auto r2 = m_radius * m_radius;
 		if (b2 > r2)            // perpendicular > r
             return false;
         auto c = sqrt(r2 - b2);
-		if (near)
-            *near = a - c;
-        if (far)
-			*far = a + c;
+        if (distance)
+        {
+            T near = a - c;
+            T far  = a + c;
+            // near < 0 means ray starts inside
+            *distance = (near < 0) ? far : near;
+        }
 		return true;
 	}
+
+    const Material<T>& material() const
+    {
+        return m_material;
+    }
+
 protected:
-    Vec3<T> m_center;
-    T       m_radius;
-    Vec3<T> m_color;
-    T       m_reflection;
-    T       m_transparency;
+    Vec3<T>            m_center;
+    T                  m_radius;
+    const Material<T>& m_material;
 };
 
 template <typename T>
@@ -57,7 +68,7 @@ public:
 	{}
 
     Vec3<T> position() const { return m_position; }
-    Vec3<T> color()  const { return m_color;  }
+    Vec3<T> color()    const { return m_color;  }
 protected:
     Vec3<T> m_position;
     Vec3<T> m_color;

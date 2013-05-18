@@ -7,99 +7,102 @@
 
 const static unsigned width     = 1280;
 const static unsigned height    = 720;
+const static unsigned max_depth = 6;
 const static float    fov       = 45;
 const static float    pi        = 3.1415926536;
-const static unsigned max_depth = 6;
-
-SDL_Surface *screen;
 
 template <typename T>
-struct Ray
+struct Scene
 {
-    Vec<T, 3> origin;
-    Vec<T, 3> direction;
+    std::list<Sphere<T>*> objects;
+    std::list<Light<T>*>  lights;
 
-    Ray(const Vec<T, 3>& orig, const Vec<T, 3>& dir) :
-        origin(orig), direction(dir)
-    {}
+    ~Scene()
+    {
+        for (auto& o: objects)
+            delete o;
+        for (auto& l: lights)
+            delete l;
+    }
 };
 
-template<typename T, typename C, typename L>
-Vec3<T> trace(const Ray<T>& ray, const C& scene, const L& lights, const int &depth)
+template<typename T>
+Vec3<T> trace(const Ray<T>& ray, const Scene<T>& scene, int depth)
 {
-	T distance = std::numeric_limits<T>::max();
-	const Sphere<T>* sphere = NULL;
+	T nearest = std::numeric_limits<T>::max();
+	const Sphere<T>* obj = NULL;
 
     // search the scene for nearest intersection
-    for(const Sphere<T>& s: scene)
+    for(auto& s: scene.objects)
     {
-		T near = std::numeric_limits<T>::max();
-        T far = std::numeric_limits<T>::max();
-		if (s.intersect(ray.origin, ray.direction, &near, &far))
+		T distance = std::numeric_limits<T>::max();
+		if (s->intersect(ray, &distance))
         {
-			if (near < 0)       // origin is inside the object
-                near = far;
-			if (near < distance)
+			if (distance < nearest)
             {
-				distance = near;
-				sphere = &s;
+				nearest = distance;
+				obj = s;
 			}
 		}
 	}
 
-	if (!sphere)                // no hit
+	if (!obj)                   // no hit
         return Vec3<T>(0);      // return black
 
-	auto point_of_hit = ray.origin + ray.direction * distance;
-	auto normal = sphere->normal(point_of_hit);
+	auto point_of_hit = ray.start + ray.dir * nearest;
+	auto normal = obj->normal(point_of_hit);
     
     // normal should always face the origin
-	if (normal.dot(ray.direction) > 0)
+	if (normal.dot(ray.dir) > 0)
         normal = -normal;
     
     // a tiny offset to make sure the point we start tracing is from outside of the object
 	const T offset = std::numeric_limits<T>::epsilon();
 
-	Vec3<T> color(0);           // the color of the pixel, initialise to 0,0,0
+    Vec3<T> color(0);
+    const Material<T>& material = obj->material();
+	Vec3<T> diffuse_color = material.diffuse(point_of_hit);
+    T       reflection_ratio = material.reflection(point_of_hit);
 
     // compute diffuse light
     // add up incoming light from all light sources
-    for(const Light<T>& l: lights)
+    for(auto& l: scene.lights)
     {
-        auto light_direction = (l.position() - point_of_hit).normalized();
+        auto light_direction = (l->position() - point_of_hit).normalized();
             
         // go through the scene check whether we're blocked from the lights
-        bool blocked = std::any_of(scene.begin(), scene.end(), [=] (const Sphere<T>& s) {
-                return s.intersect(point_of_hit + normal * offset, light_direction); });
+        bool blocked = std::any_of(scene.objects.begin(), scene.objects.end(), [=] (const Sphere<T>* o) {
+                return o->intersect({point_of_hit + normal * offset, light_direction}); });
         if (!blocked)
-            color += l.color()
+            color += l->color()
                 * std::max(T(0), normal.dot(light_direction))
-                * sphere->color()
-                * (T(1) - sphere->reflection());
+                * diffuse_color
+                * (T(1) - reflection_ratio);
     }
 
     // compute reflection
-    if (depth < max_depth && (sphere->reflection() > 0))
+    if (depth < max_depth && (obj->material().reflection(point_of_hit) > 0))
     {
-        auto reflection_direction = ray.direction - normal * 2 * ray.direction.dot(normal);
-        auto reflection = trace(Ray<float>(point_of_hit + normal * offset,
-                                           reflection_direction),
-                                scene, lights, depth + 1);
-        color += reflection * sphere->reflection() * sphere->color();
+        auto reflection_direction = ray.dir - normal * 2 * ray.dir.dot(normal);
+        auto reflection = trace(Ray<T>(point_of_hit + normal * offset, reflection_direction),
+                                scene, depth + 1);
+        color += reflection * reflection_ratio;
     }
 	return color;
 }
 
-template <typename C, typename L>
-void render(const C& scene, const L& lights)
+static SDL_Surface* screen;
+
+template <typename T>
+void render(const Scene<T>& scene)
 {
     SDL_LockSurface(screen);
     
     // eye at [0, 0, 0]
     // screen plane at [x, y, -1]
-    Vec3<float> eye(0);
-    float h = tan(fov / 360 * 2 * pi / 2) * 2;
-    float w = h * width / height;
+    Vec3<T> eye(0);
+    T h = tan(fov / 360 * 2 * pi / 2) * 2;
+    T w = h * width / height;
 
     auto row = reinterpret_cast<unsigned char*>(screen->pixels);
     for (unsigned y = 0; y < height; ++y)
@@ -107,17 +110,14 @@ void render(const C& scene, const L& lights)
         auto p = reinterpret_cast<Uint32*>(row);
         for (unsigned x = 0; x < width; ++x)
         {
-            Vec3<float> direction = {(float(x) - width / 2) / width  * w,
-                                     (float(height)/2 - y) / height * h,
-                                     -1.0f };
-            direction.normalize();
-            
-            auto pixel = trace(Ray<float>(eye, direction), scene, lights, 0);
-            
-            auto r = std::min(255, int(pixel[0]*255+0.5)); // r
-            auto g = std::min(255, int(pixel[1]*255+0.5)); // g
-            auto b = std::min(255, int(pixel[2]*255+0.5)); // b
-            *p++ = SDL_MapRGB(screen->format, r, g, b);
+            Vec3<T> direction = {(T(x) - width / 2) / width  * w,
+                                 (T(height)/2 - y) / height * h,
+                                 -1.0f };
+            direction.normalize();            
+            auto pixel = trace(Ray<T>(eye, direction), scene, 0);
+            Vec3<int> rgb = pixel * 255 + 0.5;
+            rgb.transform([] (int x) { return std::min(x, 255); });
+            *p++ = SDL_MapRGB(screen->format, rgb[0], rgb[1], rgb[2]);
         }
         row += screen->pitch;
     }
@@ -151,21 +151,22 @@ int main(int argc, char *argv[])
 	if (!screen)
 		return 1;
 
-    std::list<Sphere<float> > scene;
-    std::list<Light<float> > lights;
+    Scene<float> scene;
+
+    CheckerBoard<float> checker_board;
+    Shiny<float> shiny;
     
     // add objects
-	scene.emplace_back(Sphere<float>({0, -10004, -20}, 10000, {0.2, 0.2, 0.2}));
-	scene.emplace_back(Sphere<float>({0, 0, -20},      4,     {1.0, 0.3, 0.3}, .5));
-	scene.emplace_back(Sphere<float>({5, -1, -15},     2,     {0.9, 0.7, 0.5}, .5));
-	scene.emplace_back(Sphere<float>({-5, -1, -15},    2,     {0.8, 0.7, 0.9}, .5));
+    scene.objects = { new Sphere<float>({0, -10004, -20}, 10000, checker_board),
+                      new Sphere<float>({0, 0, -20},      4,     shiny),
+                      new Sphere<float>({5, -1, -15},     2,     shiny),
+                      new Sphere<float>({-5, -1, -15},    2,     shiny) };
     // add lights
-    lights.emplace_back(Light<float>({-10, 20, 30},  {2, 2, 2}));
+    scene.lights = { new Light<float>({-10, 20, 30},  {2, 2, 2}) };
     
-	render(scene, lights);
+	render(scene);
     
-    while (event_loop())
-        ;
+    while (event_loop());
 
     SDL_Quit();
     return 0;

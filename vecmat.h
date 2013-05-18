@@ -10,16 +10,28 @@ class Vec : public std::array<T, N>
 {
 public:
     Vec() { std::fill_n(this->begin(), N, T()); }
-    Vec(const Vec& other) = default;
+    template <typename U>
+    Vec(const Vec<U, N>& other) { std::copy_n(other.begin(), N, this->begin()); }
     Vec(const T& v) { std::fill_n(this->begin(), N, v); }
     Vec(std::initializer_list<T> l) { std::copy_n(l.begin(), N, this->begin()); }
+
+    template <typename OP>
+    Vec& transform(OP op)
+    {
+        std::transform(this->begin(), this->end(), this->begin(), op);
+        return *this;
+    }
+    template <typename OP, typename U>
+    Vec& transform(const Vec<U, N>& u, OP op)
+    {
+        std::transform(this->begin(), this->end(), u.begin(), this->begin(), op);
+        return *this;
+    }
     
     // *** multiply scalar
     Vec& operator *= (const T& x)
     {
-        for(int i = 0; i < N; ++i)
-            (*this)[i] *= x;
-        return *this;
+        return transform([&] (T v) { return v * x; } );
     }
     Vec operator * (const T& x)
     {
@@ -28,9 +40,7 @@ public:
     // *** multiply vector
     Vec& operator *= (const Vec& v)
     {
-        for(int i = 0; i < N; ++i)
-            (*this)[i] *= v[i];
-        return *this;
+        return transform(v, std::multiplies<T>());
     }    
     Vec operator * (const Vec& v) const
     {
@@ -39,9 +49,7 @@ public:
     // *** add vector
     Vec& operator += (const Vec& v)
     {
-        for(int i = 0; i < N; ++i)
-            (*this)[i] += v[i];
-        return *this;
+        return transform(v, std::plus<T>());
     }    
     Vec operator + (const Vec& v) const
     {
@@ -50,9 +58,7 @@ public:
     // *** subtract vectot
     Vec& operator -= (const Vec& v)
     {
-        for(int i = 0; i < N; ++i)
-            (*this)[i] -= v[i];
-        return *this;
+        return transform(v, std::minus<T>());
     }
     Vec operator - (const Vec& v) const
     {
@@ -66,10 +72,7 @@ public:
     // *** dot product
     T dot(const Vec& v) const
     {
-        T acc = T();
-        for(int i = 0; i < N; ++i)
-            acc += (*this)[i] * v[i];
-        return acc;
+        return std::inner_product(this->begin(), this->end(), v.begin(), T(0));
     }
     // ***
     T magnitude() const

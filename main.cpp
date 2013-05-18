@@ -33,15 +33,15 @@ Vec3<T> trace(const Ray<T>& ray, const Scene<T>& scene, int depth)
 	const Sphere<T>* obj = NULL;
 
     // search the scene for nearest intersection
-    for(auto& s: scene.objects)
+    for(auto& o: scene.objects)
     {
 		T distance = std::numeric_limits<T>::max();
-		if (s->intersect(ray, &distance))
+		if (o->intersect(ray, &distance))
         {
 			if (distance < nearest)
             {
 				nearest = distance;
-				obj = s;
+				obj = o;
 			}
 		}
 	}
@@ -51,18 +51,19 @@ Vec3<T> trace(const Ray<T>& ray, const Scene<T>& scene, int depth)
 
 	auto point_of_hit = ray.start + ray.dir * nearest;
 	auto normal = obj->normal(point_of_hit);
+    bool inside = false;
     
     // normal should always face the origin
 	if (normal.dot(ray.dir) > 0)
+    {
+        inside = true;
         normal = -normal;
+    }
     
-    // a tiny offset to make sure the point we start tracing is from outside of the object
-	const T offset = std::numeric_limits<T>::epsilon();
-
     Vec3<T> color(0);
     const Material<T>& material = obj->material();
 	Vec3<T> diffuse_color = material.diffuse(point_of_hit);
-    T       reflection_ratio = material.reflection(point_of_hit);
+    T       reflection_ratio = material.reflection();
 
     // compute diffuse light
     // add up incoming light from all light sources
@@ -72,7 +73,7 @@ Vec3<T> trace(const Ray<T>& ray, const Scene<T>& scene, int depth)
             
         // go through the scene check whether we're blocked from the lights
         bool blocked = std::any_of(scene.objects.begin(), scene.objects.end(), [=] (const Sphere<T>* o) {
-                return o->intersect({point_of_hit + normal * offset, light_direction}); });
+                return o->intersect({point_of_hit + normal * 1e-5, light_direction}); });
         if (!blocked)
             color += l->color()
                 * std::max(T(0), normal.dot(light_direction))
@@ -81,13 +82,33 @@ Vec3<T> trace(const Ray<T>& ray, const Scene<T>& scene, int depth)
     }
 
     // compute reflection
-    if (depth < max_depth && (obj->material().reflection(point_of_hit) > 0))
+    if (depth < max_depth && reflection_ratio > 0)
     {
-        auto reflection_direction = ray.dir - normal * 2 * ray.dir.dot(normal);
-        auto reflection = trace(Ray<T>(point_of_hit + normal * offset, reflection_direction),
+        auto reflection_direction = ray.dir + normal * 2 * ray.dir.dot(normal) * T(-1);
+        auto reflection = trace(Ray<T>(point_of_hit + normal * 1e-5, reflection_direction),
                                 scene, depth + 1);
         color += reflection * reflection_ratio;
     }
+
+    // compute refraction
+    if (depth < max_depth && (material.transparency() > 0))
+    {
+		auto CE = ray.dir.dot(normal) * T(-1);
+        auto ior = inside ? T(1) / material.ior() : material.ior();
+        auto eta = T(1) / ior;
+        auto GF = (ray.dir + normal * CE) * eta;
+        auto sin_t1_2 = 1 - CE * CE;
+        auto sin_t2_2 = sin_t1_2 * (eta * eta);
+        if (sin_t2_2 < T(1))
+        {
+            auto GC = normal * sqrt(1 - sin_t2_2);
+            auto refraction_direction = GF - GC;      
+            auto refraction = trace(Ray<T>(point_of_hit - normal * 1e-5, refraction_direction),
+                                    scene, depth + 1);
+            color += refraction * material.transparency();
+        }
+    }
+    
 	return color;
 }
 
@@ -155,12 +176,14 @@ int main(int argc, char *argv[])
 
     CheckerBoard<float> checker_board;
     Shiny<float> shiny;
+    Glass<float> glass;
     
     // add objects
     scene.objects = { new Sphere<float>({0, -10002, -20}, 10000, checker_board),
                       new Sphere<float>({0, 2, -20},      4,     shiny),
-                      new Sphere<float>({5, 0, -15},     2,     shiny),
-                      new Sphere<float>({-5, 0, -15},    2,     shiny) };
+                      new Sphere<float>({5, 0, -15},      2,     shiny),
+                      new Sphere<float>({-5, 0, -15},     2,     shiny),
+                      new Sphere<float>({-2, -1, -10},    1,     glass) };
     // add lights
     scene.lights = { new Light<float>({-10, 20, 30},  {2, 2, 2}) };
     

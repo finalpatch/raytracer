@@ -26,6 +26,6 @@ template<typename T>
 class Shiny : public Material<T>
 {
 public:
-    virtual Vec3<T> diffuse   (const Vec3<T>& pos) const { return Vec3<T>{.6,.8,1}; }
+    virtual Vec3<T> diffuse   (const Vec3<T>& pos) const { return Vec3<T>{.6,.6,.6}; }
     virtual T       reflection(const Vec3<T>& pos) const { return T(0.5); }
 };

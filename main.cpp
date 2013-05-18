@@ -157,10 +157,10 @@ int main(int argc, char *argv[])
     Shiny<float> shiny;
     
     // add objects
-    scene.objects = { new Sphere<float>({0, -10004, -20}, 10000, checker_board),
-                      new Sphere<float>({0, 0, -20},      4,     shiny),
-                      new Sphere<float>({5, -1, -15},     2,     shiny),
-                      new Sphere<float>({-5, -1, -15},    2,     shiny) };
+    scene.objects = { new Sphere<float>({0, -10002, -20}, 10000, checker_board),
+                      new Sphere<float>({0, 2, -20},      4,     shiny),
+                      new Sphere<float>({5, 0, -15},     2,     shiny),
+                      new Sphere<float>({-5, 0, -15},    2,     shiny) };
     // add lights
     scene.lights = { new Light<float>({-10, 20, 30},  {2, 2, 2}) };
     

@@ -81,13 +81,16 @@ Vec3<T> trace(const Ray<T>& ray, const Scene<T>& scene, int depth)
                 * (T(1) - reflection_ratio);
     }
 
+    T facing = std::max(T(0), -ray.dir.dot(normal));
+    T fresneleffect = reflection_ratio + (1 - reflection_ratio) * pow((1 - facing), 5);
+
     // compute reflection
     if (depth < max_depth && reflection_ratio > 0)
     {
         auto reflection_direction = ray.dir + normal * 2 * ray.dir.dot(normal) * T(-1);
         auto reflection = trace(Ray<T>(point_of_hit + normal * 1e-5, reflection_direction),
                                 scene, depth + 1);
-        color += reflection * reflection_ratio;
+        color += reflection * fresneleffect;
     }
 
     // compute refraction
@@ -105,7 +108,7 @@ Vec3<T> trace(const Ray<T>& ray, const Scene<T>& scene, int depth)
             auto refraction_direction = GF - GC;      
             auto refraction = trace(Ray<T>(point_of_hit - normal * 1e-5, refraction_direction),
                                     scene, depth + 1);
-            color += refraction * material.transparency();
+            color += refraction * (1 - fresneleffect) * material.transparency();
         }
     }
     

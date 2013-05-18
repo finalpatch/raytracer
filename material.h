@@ -13,7 +13,7 @@ template<typename T>
 struct Shiny : Material<T>
 {
     Vec3<T> diffuse (const Vec3<T>& pos) const { return Vec3<T>{.6,.6,.6}; }
-    T       reflection() const { return T(0.5); }
+    T       reflection() const { return T(0.1); }
 };
 
 template<typename T>
@@ -26,14 +26,14 @@ struct CheckerBoard : Material<T>
         else
             return { 0, 0, 0 };
     }
-    T reflection() const { return T(0.6); }
+    T reflection() const { return T(0.1); }
 };
 
 template<typename T>
 struct Glass : Material<T>
 {
     Vec3<T> diffuse   (const Vec3<T>& pos) const { return Vec3<T>{ .1,.2,.1 }; }
-    T       reflection()   const { return T(0.3); }
+    T       reflection()   const { return T(0.1); }
     T       transparency() const { return T(.7); }
     T       ior()          const { return T(1.4); }
 };

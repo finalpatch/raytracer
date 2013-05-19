@@ -52,14 +52,14 @@ Vec3<T> trace(const Ray<T>& ray, const Scene<T>& scene, int depth)
 	auto point_of_hit = ray.start + ray.dir * nearest;
 	auto normal = obj->normal(point_of_hit);
     bool inside = false;
-    
+
     // normal should always face the origin
 	if (normal.dot(ray.dir) > 0)
     {
         inside = true;
         normal = -normal;
     }
-    
+
     Vec3<T> color(0);
     const Material<T>& material = obj->material();
 	Vec3<T> diffuse_color = material.diffuse(point_of_hit);
@@ -70,7 +70,7 @@ Vec3<T> trace(const Ray<T>& ray, const Scene<T>& scene, int depth)
     for(auto& l: scene.lights)
     {
         auto light_direction = (l->position() - point_of_hit).normalized();
-            
+
         // go through the scene check whether we're blocked from the lights
         bool blocked = std::any_of(scene.objects.begin(), scene.objects.end(), [=] (const Sphere<T>* o) {
                 return o->intersect({point_of_hit + normal * 1e-5, light_direction}); });
@@ -105,30 +105,28 @@ Vec3<T> trace(const Ray<T>& ray, const Scene<T>& scene, int depth)
         if (sin_t2_2 < T(1))
         {
             auto GC = normal * sqrt(1 - sin_t2_2);
-            auto refraction_direction = GF - GC;      
+            auto refraction_direction = GF - GC;
             auto refraction = trace(Ray<T>(point_of_hit - normal * 1e-5, refraction_direction),
                                     scene, depth + 1);
             color += refraction * (1 - fresneleffect) * material.transparency();
         }
     }
-    
+
 	return color;
 }
 
-static SDL_Surface* screen;
-
 template <typename T>
-void render(const Scene<T>& scene)
+void render(const Scene<T>& scene, SDL_Surface* surface)
 {
-    SDL_LockSurface(screen);
-    
+    SDL_LockSurface(surface);
+
     // eye at [0, 0, 0]
     // screen plane at [x, y, -1]
     Vec3<T> eye(0);
     T h = tan(fov / 360 * 2 * pi / 2) * 2;
     T w = h * width / height;
 
-    auto row = reinterpret_cast<unsigned char*>(screen->pixels);
+    auto row = reinterpret_cast<unsigned char*>(surface->pixels);
     for (unsigned y = 0; y < height; ++y)
     {
         auto p = reinterpret_cast<Uint32*>(row);
@@ -137,50 +135,35 @@ void render(const Scene<T>& scene)
             Vec3<T> direction = {(T(x) - width / 2) / width  * w,
                                  (T(height)/2 - y) / height * h,
                                  -1.0f };
-            direction.normalize();            
+            direction.normalize();
             auto pixel = trace(Ray<T>(eye, direction), scene, 0);
             Vec3<int> rgb = pixel * 255 + 0.5;
             rgb.transform([] (int x) { return std::min(x, 255); });
-            *p++ = SDL_MapRGB(screen->format, rgb[0], rgb[1], rgb[2]);
+            // *p++ = SDL_MapRGB(surface->format, rgb[0], rgb[1], rgb[2]);
+            *p++ = rgb[2] | (rgb[1] << 8) | (rgb[0] << 16);
+            
         }
-        row += screen->pitch;
+        row += surface->pitch;
     }
-    SDL_UnlockSurface(screen);
-    SDL_UpdateRect(screen, 0, 0, 0, 0);
-}
-
-bool event_loop()
-{
-	SDL_Event event;
-	while (SDL_WaitEvent(&event))
-	{
-		switch (event.type) 
-		{
-		case SDL_KEYUP:
-			if (event.key.keysym.sym == SDLK_ESCAPE)
-				return false;
-			break;
-		case SDL_QUIT:
-			return false;
-		}
-	}
-    return true;
+    SDL_UnlockSurface(surface);
+    SDL_UpdateRect(surface, 0, 0, 0, 0);
 }
 
 int main(int argc, char *argv[])
 {
 	SDL_Init(SDL_INIT_VIDEO);
-	screen = SDL_SetVideoMode(width, height, 32, SDL_SWSURFACE);
+    atexit(SDL_Quit);
+    SDL_Surface* screen = SDL_SetVideoMode(width, height, 32, SDL_SWSURFACE);
 
 	if (!screen)
 		return 1;
 
-    Scene<float> scene;
-
     CheckerBoard<float> checker_board;
     Shiny<float> shiny;
     Glass<float> glass;
-    
+
+    Scene<float> scene;
+
     // add objects
     scene.objects = { new Sphere<float>({0, -10002, -20}, 10000, checker_board),
                       new Sphere<float>({0, 2, -20},      4,     shiny),
@@ -189,11 +172,23 @@ int main(int argc, char *argv[])
                       new Sphere<float>({-2, -1, -10},    1,     glass) };
     // add lights
     scene.lights = { new Light<float>({-10, 20, 30},  {2, 2, 2}) };
-    
-	render(scene);
-    
-    while (event_loop());
 
-    SDL_Quit();
+	render(scene, screen);
+
+#ifndef EMSCRIPTEN
+	SDL_Event event;
+	while (SDL_WaitEvent(&event))
+	{
+		switch (event.type)
+		{
+		case SDL_KEYUP:
+			if (event.key.keysym.sym == SDLK_ESCAPE)
+				return 0;
+			break;
+		case SDL_QUIT:
+			return 0;
+		}
+	}
+#endif
     return 0;
 }

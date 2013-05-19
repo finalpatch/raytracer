@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <iostream>
 #include <cmath>
+#include <numeric>
 
 template<typename T, std::size_t N>
 class Vec : public std::array<T, N>

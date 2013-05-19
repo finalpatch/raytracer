@@ -15,18 +15,40 @@ struct Ray
 };
 
 template <typename T>
-class Sphere
+class Light
+{
+public:
+    Light(const Vec3<T> &p, const Vec3<T> &clr) : 
+		m_position(p), m_color(clr)
+	{}
+
+    Vec3<T> position() const { return m_position; }
+    Vec3<T> color()    const { return m_color;  }
+protected:
+    Vec3<T> m_position;
+    Vec3<T> m_color;
+};
+
+template <typename T>
+class Object
+{
+public:
+    virtual Vec3<T> normal(const Vec3<T>& pos) const = 0;
+	virtual bool intersect(const Ray<T>& ray, T* distance = NULL) const = 0;
+    virtual const Material<T>& material() const = 0;
+};
+
+template <typename T>
+class Sphere : public Object<T>
 {
 public:
     Sphere(const Vec3<T> &c, const T &r, const Material<T>& m) :
 		m_center(c), m_radius(r), m_material(m)
 	{}
-
     Vec3<T> normal(const Vec3<T>& pos) const
     {
         return (pos - m_center).normalized();
-    }
-    
+    }    
 	bool intersect(const Ray<T>& ray, T* distance = NULL) const
 	{
 		auto l = m_center - ray.start;
@@ -47,29 +69,12 @@ public:
         }
 		return true;
 	}
-
     const Material<T>& material() const
     {
         return m_material;
     }
-
 protected:
     Vec3<T>            m_center;
     T                  m_radius;
     const Material<T>& m_material;
-};
-
-template <typename T>
-class Light
-{
-public:
-    Light(const Vec3<T> &p, const Vec3<T> &clr) : 
-		m_position(p), m_color(clr)
-	{}
-
-    Vec3<T> position() const { return m_position; }
-    Vec3<T> color()    const { return m_color;  }
-protected:
-    Vec3<T> m_position;
-    Vec3<T> m_color;
 };

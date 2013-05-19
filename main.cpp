@@ -1,7 +1,6 @@
 #include "vecmat.h"
 #include "objects.h"
 #include "SDL/SDL.h"
-#include <stdint.h>
 #include <list>
 #include <limits>
 
@@ -14,7 +13,7 @@ const static float    pi        = 3.1415926536;
 template <typename T>
 struct Scene
 {
-    std::list<Sphere<T>*> objects;
+    std::list<Object<T>*> objects;
     std::list<Light<T>*>  lights;
 
     ~Scene()
@@ -30,7 +29,7 @@ template<typename T>
 Vec3<T> trace(const Ray<T>& ray, const Scene<T>& scene, int depth)
 {
 	T nearest = std::numeric_limits<T>::max();
-	const Sphere<T>* obj = NULL;
+	const Object<T>* obj = NULL;
 
     // search the scene for nearest intersection
     for(auto& o: scene.objects)
@@ -72,7 +71,7 @@ Vec3<T> trace(const Ray<T>& ray, const Scene<T>& scene, int depth)
         auto light_direction = (l->position() - point_of_hit).normalized();
 
         // go through the scene check whether we're blocked from the lights
-        bool blocked = std::any_of(scene.objects.begin(), scene.objects.end(), [=] (const Sphere<T>* o) {
+        bool blocked = std::any_of(scene.objects.begin(), scene.objects.end(), [=] (const Object<T>* o) {
                 return o->intersect({point_of_hit + normal * 1e-5, light_direction}); });
         if (!blocked)
             color += l->color()

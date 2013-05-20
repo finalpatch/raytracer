@@ -136,8 +136,9 @@ void render(const Scene<T>& scene, SDL_Surface* surface)
                                  -1.0f };
             direction.normalize();
             auto pixel = trace(Ray<T>(eye, direction), scene, 0);
-            Vec3<int> rgb = pixel * 255 + 0.5;
-            rgb.transform([] (int x) { return std::min(x, 255); });
+            Vec3<int> rgb;
+            std::transform(pixel.begin(), pixel.end(), rgb.begin(), [] (T x) {
+                    return std::min(255, int(pow(x, 1/2.2) * 255 + 0.5)); });
             // *p++ = SDL_MapRGB(surface->format, rgb[0], rgb[1], rgb[2]);
             *p++ = rgb[2] | (rgb[1] << 8) | (rgb[0] << 16);
             

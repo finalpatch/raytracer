@@ -10,6 +10,25 @@ const static unsigned max_depth = 6;
 const static float    fov       = 45;
 const static float    pi        = 3.1415926536;
 
+#include <sys/time.h>
+class Timing
+{
+    timeval start_;
+public:
+	void start()
+	{
+        gettimeofday(&start_, NULL);
+	}
+	int stop()
+	{
+        timeval end;
+        gettimeofday(&end, NULL);
+        double elapsed = (end.tv_sec - start_.tv_sec) * 1000000.0;
+        elapsed += (end.tv_usec - start_.tv_usec);
+        return int(elapsed);
+    }
+};
+
 template <typename T>
 struct Scene
 {
@@ -173,7 +192,11 @@ int main(int argc, char *argv[])
     // add lights
     scene.lights = { new Light<float>({-10, 20, 30},  {2, 2, 2}) };
 
+	Timing t;
+	t.start();
 	render(scene, screen);
+	int elapsed = t.stop();
+	printf("rendering time %d ms\n", elapsed/1000);
 
 #ifndef EMSCRIPTEN
 	SDL_Event event;

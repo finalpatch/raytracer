@@ -33,6 +33,7 @@ template <typename T>
 class Object
 {
 public:
+    virtual ~Object() {}
     virtual Vec3<T> normal(const Vec3<T>& pos) const = 0;
 	virtual bool intersect(const Ray<T>& ray, T* distance = NULL) const = 0;
     virtual const Material<T>& material() const = 0;

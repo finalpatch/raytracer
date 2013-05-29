@@ -185,8 +185,7 @@ else
 
     float dot(in Vec3 v1, in Vec3 v2)
     {
-        const float[3] t = v1.v[] * v2.v[];
-        return t[0] + t[1] + t[2];
+        return dotProduct(v1.v, v2.v);
     }
     float magnitude(in Vec3 v)
     {
@@ -388,10 +387,10 @@ void render (Scene scene, SDL_Surface* surface)
 
 	auto start = Clock.currTime();
 
-	foreach (y; parallel(sequence!("n")()[0..height]))
+	foreach (y; parallel(iota(height)))
     {
 		uint[] row = (cast(uint*)(surface.pixels + surface.pitch * y))[0..width];
-		foreach (x; 0..width)
+		foreach (x; iota(width))
 		{
 			float xx = x, yy = y, ww = width, hh = height;
             Vec3 dir = normalize(Vec3([(xx - ww / 2.0f) / ww  * w,

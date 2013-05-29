@@ -128,8 +128,8 @@ else
                 const float[3] t = v[] * (-1);
                 return Vec3(t);
             }
-            else static
-                     assert(0, "Operator "~op~" not implemented");		
+            else
+                assert(0, "Operator "~op~" not implemented");
         }
         Vec3 opBinary(string op)(float rhs)
         {

@@ -22,8 +22,9 @@ all : $(EXECUTABLE)
 
 clean :
 	$(RM-F) *.obj
-	$(RM-F) *.exe
 	$(RM-F) *.o
+	$(RM-F) *.exe
+	$(RM-F) $(EXECUTABLE)
 
 rebuild: clean all
 

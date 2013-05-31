@@ -5,6 +5,7 @@ import std.range;
 import std.datetime;
 import std.stdio;
 import std.conv;
+import std.string;
 import derelict.sdl.sdl;
 
 immutable width     = 1280;
@@ -12,14 +13,12 @@ immutable height    = 720;
 immutable fov       = 45;
 immutable max_depth = 6;
 
-// loop unrolling helper
-template Tuple(T...) { alias T Tuple; }
-template Range(uint n)
+template Unroll(alias CODE, alias N, alias SEP="")
 {
-    static if( n == 0 )
-        alias Tuple!() Range;
+    static if (N == 1)
+        enum Unroll = format(CODE, 0);
     else
-        alias Tuple!(Range!(n-1), n-1) Range;
+        enum Unroll = Unroll!(CODE, N-1, SEP)~SEP~format(CODE, N-1);
 }
 
 struct Vec(alias N, T)
@@ -30,9 +29,9 @@ struct Vec(alias N, T)
     this (T...) (T args)
     {
         static if(args.length == 1)
-            foreach(i; 0..N) v[i] = args[0];
+            mixin(Unroll!("v[%1$d]=args[0];", N));
         else static if(args.length == N)
-            foreach(i, x; args) v[i] = x;
+            mixin(Unroll!("v[%1$d]=args[%1$d];", N));
         else
             static assert("wrong number of arguments");
     }
@@ -40,30 +39,27 @@ struct Vec(alias N, T)
         if( op =="-" )
     {
         Vec t;
-        foreach(i; 0..N) t.v[i] = v[i] * (-1);
+        mixin(Unroll!("t.v[%1$d]=v[%1$d] * (-1);", N));
         return t;
     }
     Vec opBinary(string op)(T rhs) const
         if( op == "+" || op =="-" || op=="*" || op=="/" )
     {
         Vec t;
-        foreach(i,_;Range!N)
-            t.v[i] = mixin("v["~to!string(i)~"] "~op~" rhs");
+        mixin(Unroll!("t.v[%1$d]=v[%1$d]"~op~"rhs;", N));
         return t;
     }
     Vec opBinary(string op)(Vec rhs) const
         if( op == "+" || op =="-" || op=="*" || op=="/" )
     {
         Vec t;
-        foreach(i,_;Range!N)
-            t.v[i] = mixin("v["~to!string(i)~"] "~op~" rhs.v["~to!string(i)~"]");
-       return t;
+        mixin(Unroll!("t.v[%1$d]=v[%1$d]"~op~"rhs.v[%1$d];", N));
+        return t;
     }
     ref Vec opOpAssign(string op)(Vec rhs)
         if( op == "+" || op =="-" || op=="*" || op=="/" )
     {
-        foreach(i,_;Range!N)
-            mixin("v["~to!string(i)~"]"~op~"=rhs.v["~to!string(i)~"];");
+        mixin(Unroll!("v[%1$d]"~op~"=rhs.v[%1$d];", N));
         return this;
     }
     T[] opSlice()
@@ -75,19 +71,7 @@ struct Vec(alias N, T)
 
 V.val_type dot(V)(V v1, V v2)
 {
-    static if(V.size == 3)
-    {
-        return v1.v[0]*v2.v[0]
-            +  v1.v[1]*v2.v[1]
-            +  v1.v[2]*v2.v[2];
-    }
-    else
-    {
-        V.val_type[V.size] p;
-        foreach(i,_;Range!(V.size))
-            p[i] = v1.v[i] * v2.v[i];
-        return p[0] + p[1] + p[2];
-    }
+    return mixin(Unroll!("v1.v[%1$d]*v2.v[%1$d]", V.size, "+"));
 }
 V.val_type magnitude(V)(V v)
 {
@@ -95,13 +79,8 @@ V.val_type magnitude(V)(V v)
 }
 auto normalize(V)(V v)
 {
-    static if(V.size == 3)
-    {
-        V.val_type[3] t = v.v[] / magnitude(v);
-        return Vec3(t[0], t[1], t[2]);
-    }
-    else
-        return v / magnitude(v);
+    V.val_type[V.size] t = v.v[] / magnitude(v);
+    mixin("return Vec3("~Unroll!("t[%1$d]", V.size, ",")~");");
 }
 
 alias Vec!(3, float) Vec3;

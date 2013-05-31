@@ -4,6 +4,7 @@ import std.parallelism;
 import std.range;
 import std.datetime;
 import std.stdio;
+import std.conv;
 import derelict.sdl.sdl;
 
 immutable width     = 1280;
@@ -11,75 +12,99 @@ immutable height    = 720;
 immutable fov       = 45;
 immutable max_depth = 6;
 
-struct Vec3
+// loop unrolling helper
+template Tuple(T...) { alias T Tuple; }
+template Range(uint n)
 {
-    this(float x)
+    static if( n == 0 )
+        alias Tuple!() Range;
+    else
+        alias Tuple!(Range!(n-1), n-1) Range;
+}
+
+struct Vec(alias N, T)
+{
+    enum size = N;
+    alias T val_type;
+    
+    this (T...) (T args)
     {
-        v[0] = x;
-        v[1] = x;
-        v[2] = x;
+        static if(args.length == 1)
+            foreach(i; 0..N) v[i] = args[0];
+        else static if(args.length == N)
+            foreach(i, x; args) v[i] = x;
+        else
+            static assert("wrong number of arguments");
     }
-    this(float x, float y, float z)
-    {
-        v[0] = x;
-        v[1] = y;
-        v[2] = z;
-    }
-    Vec3 opUnary(string op)() const
+    Vec opUnary(string op)() const
         if( op =="-" )
     {
-        Vec3 t;
-        t.v[0] = v[0] * (-1);
-        t.v[1] = v[1] * (-1);
-        t.v[2] = v[2] * (-1);
+        Vec t;
+        foreach(i; 0..N) t.v[i] = v[i] * (-1);
         return t;
     }
-    Vec3 opBinary(string op)(float rhs) const
+    Vec opBinary(string op)(T rhs) const
         if( op == "+" || op =="-" || op=="*" || op=="/" )
     {
-        Vec3 t;
-        t.v[0] = mixin("v[0]"~op~"rhs");
-        t.v[1] = mixin("v[1]"~op~"rhs");
-        t.v[2] = mixin("v[2]"~op~"rhs");
+        Vec t;
+        foreach(i,_;Range!N)
+            t.v[i] = mixin("v["~to!string(i)~"] "~op~" rhs");
         return t;
     }
-    Vec3 opBinary(string op)(Vec3 rhs) const
+    Vec opBinary(string op)(Vec rhs) const
         if( op == "+" || op =="-" || op=="*" || op=="/" )
     {
-       Vec3 t;
-       t.v[0] = mixin("v[0] "~op~" rhs.v[0]");
-       t.v[1] = mixin("v[1] "~op~" rhs.v[1]");
-       t.v[2] = mixin("v[2] "~op~" rhs.v[2]");
+        Vec t;
+        foreach(i,_;Range!N)
+            t.v[i] = mixin("v["~to!string(i)~"] "~op~" rhs.v["~to!string(i)~"]");
        return t;
     }
-    ref Vec3 opOpAssign(string op)(Vec3 rhs)
+    ref Vec opOpAssign(string op)(Vec rhs)
         if( op == "+" || op =="-" || op=="*" || op=="/" )
     {
-        mixin("v[0]"~op~"=rhs.v[0];");
-        mixin("v[1]"~op~"=rhs.v[1];");
-        mixin("v[2]"~op~"=rhs.v[2];");
+        foreach(i,_;Range!N)
+            mixin("v["~to!string(i)~"]"~op~"=rhs.v["~to!string(i)~"];");
         return this;
     }
-    float[] opSlice()
+    T[] opSlice()
     {
         return v;
     }
-    float[3] v;
+    T[N] v;
 }
 
-float dot(Vec3 v1, Vec3 v2)
+V.val_type dot(V)(V v1, V v2)
 {
-    return v1.v[0]*v2.v[0]+v1.v[1]*v2.v[1]+v1.v[2]*v2.v[2];
+    static if(V.size == 3)
+    {
+        return v1.v[0]*v2.v[0]
+            +  v1.v[1]*v2.v[1]
+            +  v1.v[2]*v2.v[2];
+    }
+    else
+    {
+        V.val_type[V.size] p;
+        foreach(i,_;Range!(V.size))
+            p[i] = v1.v[i] * v2.v[i];
+        return p[0] + p[1] + p[2];
+    }
 }
-float magnitude(Vec3 v)
+V.val_type magnitude(V)(V v)
 {
     return sqrt(dot(v, v));
 }
-Vec3 normalize(Vec3 v)
+auto normalize(V)(V v)
 {
-    float[3] t = v.v[] / magnitude(v);
-    return Vec3(t[0], t[1], t[2]);
+    static if(V.size == 3)
+    {
+        V.val_type[3] t = v.v[] / magnitude(v);
+        return Vec3(t[0], t[1], t[2]);
+    }
+    else
+        return v / magnitude(v);
 }
+
+alias Vec!(3, float) Vec3;
 
 struct Ray
 {
@@ -106,15 +131,15 @@ public:
     }
     final Vec3 normal(Vec3 pos) const
     {
-        return normalize(pos - m_center);
+        return (pos - m_center).normalize();
     }
     final bool intersect(Ray ray, float* distance = null) const
     {
         auto l = m_center - ray.start;
-        auto a = dot(l, ray.dir);
+        auto a = l.dot(ray.dir);
         if (a < 0)              // opposite direction
             return false;
-        auto b2 = dot(l, l) - a * a;
+        auto b2 = l.dot(l) - a * a;
         auto r2 = m_radius * m_radius;
         if (b2 > r2)            // perpendicular > r
             return false;
@@ -196,7 +221,7 @@ Vec3 trace (Ray ray, Scene scene, int depth)
     auto normal = obj.normal(point_of_hit);
     bool inside = false;
 
-    if (dot(normal, ray.dir) > 0)
+    if (normal.dot(ray.dir) > 0)
     {
         inside = true;
         normal = -normal;
@@ -207,7 +232,7 @@ Vec3 trace (Ray ray, Scene scene, int depth)
 
     foreach(l; scene.lights)
     {
-        auto light_direction = normalize(l.position() - point_of_hit);
+        auto light_direction = (l.position() - point_of_hit).normalize();
         immutable r = Ray(point_of_hit + normal * 1e-5, light_direction);
 
         // go through the scene check whether we're blocked from the lights
@@ -215,7 +240,7 @@ Vec3 trace (Ray ray, Scene scene, int depth)
 
         if (!blocked)
             color += l.color()
-                * max(0, dot(normal,light_direction))
+                * max(0, normal.dot(light_direction))
                 * obj.color()
                 * (1.0f - reflection_ratio);
     }
@@ -267,9 +292,9 @@ void render (Scene scene, SDL_Surface* surface)
         foreach (x; 0..width)
         {
             float xx = x, yy = y, ww = width, hh = height;
-            Vec3 dir = normalize(Vec3((xx - ww / 2.0f) / ww  * w,
-                                       (hh/2.0f - yy) / hh * h,
-                                       -1.0f));
+            Vec3 dir = (Vec3((xx - ww / 2.0f) / ww  * w,
+                             (hh/2.0f - yy) / hh * h,
+                             -1.0f)).normalize();
             auto pixel = trace(Ray(eye, dir), scene, 0);
             auto rgb = map!("cast(ubyte)min(255, a*255+0.5)")(pixel[]);
             row[x] = SDL_MapRGB(surface.format, rgb[0], rgb[1], rgb[2]);

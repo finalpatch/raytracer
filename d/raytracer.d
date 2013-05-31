@@ -15,10 +15,7 @@ immutable max_depth = 6;
 
 template Unroll(alias CODE, alias N, alias SEP="")
 {
-    static if (N == 1)
-        enum Unroll = format(CODE, 0);
-    else
-        enum Unroll = Unroll!(CODE, N-1, SEP)~SEP~format(CODE, N-1);
+    enum Unroll = iota(N).map!(i => format(CODE, i)).join(SEP);
 }
 
 struct Vec(alias N, T)

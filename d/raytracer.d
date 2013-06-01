@@ -15,7 +15,8 @@ immutable max_depth = 6;
 
 template Unroll(alias CODE, alias N, alias SEP="")
 {
-    enum Unroll = iota(N).map!(i => format(CODE, i)).join(SEP);
+    enum t = replace(CODE, "%", "%1$d");
+    enum Unroll = iota(N).map!(i => format(t, i)).join(SEP);
 }
 
 struct Vec(T, alias N)
@@ -26,9 +27,9 @@ struct Vec(T, alias N)
     this (T...) (T args)
     {
         static if(args.length == 1)
-            mixin(Unroll!("v[%1$d]=args[0];", N));
+            mixin(Unroll!("v[%]=args[0];", N));
         else static if(args.length == N)
-            mixin(Unroll!("v[%1$d]=args[%1$d];", N));
+            mixin(Unroll!("v[%]=args[%];", N));
         else
             static assert("wrong number of arguments");
     }
@@ -36,27 +37,27 @@ struct Vec(T, alias N)
         if( op =="-" )
     {
         Vec t;
-        mixin(Unroll!("t.v[%1$d]=v[%1$d] * (-1);", N));
+        mixin(Unroll!("t.v[%]=v[%] * (-1);", N));
         return t;
     }
     Vec opBinary(string op)(T rhs) const
         if( op == "+" || op =="-" || op=="*" || op=="/" )
     {
         Vec t;
-        mixin(Unroll!("t.v[%1$d]=v[%1$d]"~op~"rhs;", N));
+        mixin(Unroll!("t.v[%]=v[%]"~op~"rhs;", N));
         return t;
     }
     Vec opBinary(string op)(Vec rhs) const
         if( op == "+" || op =="-" || op=="*" || op=="/" )
     {
         Vec t;
-        mixin(Unroll!("t.v[%1$d]=v[%1$d]"~op~"rhs.v[%1$d];", N));
+        mixin(Unroll!("t.v[%]=v[%]"~op~"rhs.v[%];", N));
         return t;
     }
     ref Vec opOpAssign(string op)(Vec rhs)
         if( op == "+" || op =="-" || op=="*" || op=="/" )
     {
-        mixin(Unroll!("v[%1$d]"~op~"=rhs.v[%1$d];", N));
+        mixin(Unroll!("v[%]"~op~"=rhs.v[%];", N));
         return this;
     }
     T[] opSlice()
@@ -68,7 +69,7 @@ struct Vec(T, alias N)
 
 V.valtype dot(V)(V v1, V v2)
 {
-    return mixin(Unroll!("v1.v[%1$d]*v2.v[%1$d]", V.size, "+"));
+    return mixin(Unroll!("v1.v[%]*v2.v[%]", V.size, "+"));
 }
 V.valtype magnitude(V)(V v)
 {
@@ -262,7 +263,7 @@ void render (Scene scene, SDL_Surface* surface)
     float h = tan(cast(float)fov / 360 * 2 * PI / 2) * 2;
     float w = h * width / height;
 
-    foreach (y; (iota(height)))
+    foreach (y; parallel(iota(height)))
     {
         uint* row = cast(uint*)(surface.pixels + surface.pitch * y);
         foreach (x; 0..width)

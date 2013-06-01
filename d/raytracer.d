@@ -98,13 +98,14 @@ struct Ray
 class Sphere
 {
 public:
-    this(Vec3 c, float r, Vec3 clr, float refl = 0, float trans = 0)
+    this(Vec3 c, float r, Vec3 clr, float refl = 0, float trans = 0, bool chkbrd = false)
     {
         m_center = c;
         m_radius = r;
         m_color = clr;
         m_reflection = refl;
         m_transparency = trans;
+        m_checkerBoard = chkbrd;
     }
     final Vec3 normal(Vec3 pos) const
     {
@@ -130,9 +131,14 @@ public:
         // near < 0 means ray starts inside
         return true;
     }
-    final Vec3 color() const
+    final Vec3 color(Vec3 pos) const
     {
-        return m_color;
+        static immutable black = Vec3(0);
+        static immutable white = Vec3(1);
+        if (m_checkerBoard)
+            return ((to!int(pos.v[2]) + to!int(pos.v[0])) % 2) ? black : white;
+        else
+            return m_color;
     }
     final float reflection_ratio() const
     {
@@ -148,6 +154,7 @@ protected:
     Vec3            m_color;
     float           m_reflection;
     float           m_transparency;
+    bool            m_checkerBoard;
 };
 
 class Light
@@ -218,7 +225,7 @@ Vec3 trace (Ray ray, Scene scene, int depth)
         if (!blocked)
             color += l.color()
                 * max(0, normal.dot(light_direction))
-                * obj.color()
+                * obj.color(point_of_hit)
                 * (1.0f - reflection_ratio);
     }
 
@@ -290,7 +297,7 @@ int main()
         return 1;
 
     Scene scene;
-    scene.objects = [new Sphere(Vec3(0.0f, -10002.0f, -20.0f), 10000, Vec3(.8, .8, .8)),
+    scene.objects = [new Sphere(Vec3(0.0f, -10002.0f, -20.0f), 10000, Vec3(.8, .8, .8), 0.0, 0.0, true),
                      new Sphere(Vec3(0.0f, 2.0f, -20.0f), 4         , Vec3(.8, .5, .5), 0.5),
                      new Sphere(Vec3(5.0f, 0.0f, -15.0f), 2         , Vec3(.3, .8, .8), 0.2),
                      new Sphere(Vec3(-5.0f, 0.0f, -15.0f),2         , Vec3(.3, .5, .8), 0.2),

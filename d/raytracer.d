@@ -18,10 +18,10 @@ template Unroll(alias CODE, alias N, alias SEP="")
     enum Unroll = iota(N).map!(i => format(CODE, i)).join(SEP);
 }
 
-struct Vec(alias N, T)
+struct Vec(T, alias N)
 {
     enum size = N;
-    alias T val_type;
+    alias T valtype;
     
     this (T...) (T args)
     {
@@ -66,21 +66,21 @@ struct Vec(alias N, T)
     T[N] v;
 }
 
-V.val_type dot(V)(V v1, V v2)
+V.valtype dot(V)(V v1, V v2)
 {
     return mixin(Unroll!("v1.v[%1$d]*v2.v[%1$d]", V.size, "+"));
 }
-V.val_type magnitude(V)(V v)
+V.valtype magnitude(V)(V v)
 {
     return sqrt(dot(v, v));
 }
 auto normalize(V)(V v)
 {
-    V.val_type[V.size] t = v.v[] / magnitude(v);
-    mixin("return Vec3("~Unroll!("t[%1$d]", V.size, ",")~");");
+    v.v[] /= magnitude(v);
+    return v;
 }
 
-alias Vec!(3, float) Vec3;
+alias Vec!(float,3) Vec3;
 
 struct Ray
 {

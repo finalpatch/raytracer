@@ -275,12 +275,20 @@ void render (Scene scene, SDL_Surface* surface)
         uint* row = cast(uint*)(surface.pixels + surface.pitch * y);
         foreach (x; 0..width)
         {
-            float xx = x, yy = y, ww = width, hh = height;
-            Vec3 dir = (Vec3((xx - ww / 2.0f) / ww  * w,
-                             (hh/2.0f - yy) / hh * h,
-                             -1.0f)).normalize();
-            auto pixel = trace(Ray(eye, dir), scene, 0);
-            auto rgb = map!("cast(ubyte)min(255, a*255+0.5)")(pixel[]);
+            Vec3 pixel = 0.0f;
+            foreach (suby; 0..2)
+            {
+                foreach (subx; 0..2)
+                {
+                    float xx = x, yy = y, ww = width, hh = height;
+                    xx += 0.5f*subx; yy += 0.5f*suby;
+                    Vec3 dir = (Vec3((xx - ww / 2.0f) / ww  * w,
+                                     (hh/2.0f - yy) / hh * h,
+                                     -1.0f)).normalize();
+                    pixel += trace(Ray(eye, dir), scene, 0);
+                }
+            }
+            auto rgb = map!(a => cast(ubyte)min(255, a*0.25*255+0.5))(pixel[]);
             row[x] = SDL_MapRGB(surface.format, rgb[0], rgb[1], rgb[2]);
         }
     }

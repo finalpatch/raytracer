@@ -223,10 +223,15 @@ Vec3 trace (Ray ray, Scene scene, int depth)
         bool blocked = any!(o => o.intersect(r))(scene.objects);
 
         if (!blocked)
+        {
             color += l.color()
                 * max(0, normal.dot(light_direction))
                 * obj.color(point_of_hit)
                 * (1.0f - reflection_ratio);
+            auto half_angle = (-ray.dir + light_direction).normalize();
+            auto specular = pow(max(0, normal.dot(half_angle)), 30);
+            color += l.color() * obj.color(point_of_hit) * specular * .5;
+        }
     }
 
     float facing = max(0, -ray.dir.dot(normal));

@@ -311,9 +311,9 @@ int main()
 
     Scene scene;
     scene.objects = [new Sphere(Vec3(0.0f, -10002.0f, -20.0f), 10000, Vec3(.8, .8, .8), 0.0, 0.0, true),
-                     new Sphere(Vec3(0.0f, 2.0f, -20.0f), 4         , Vec3(.8, .5, .5), 0.5),
-                     new Sphere(Vec3(5.0f, 0.0f, -15.0f), 2         , Vec3(.3, .8, .8), 0.2),
-                     new Sphere(Vec3(-5.0f, 0.0f, -15.0f),2         , Vec3(.3, .5, .8), 0.2),
+                     new Sphere(Vec3(0.0f, 2.0f, -20.0f), 4         , Vec3(.8, .5, .5), 0.2),
+                     new Sphere(Vec3(5.0f, 0.0f, -15.0f), 2         , Vec3(.3, .8, .8), 0.1),
+                     new Sphere(Vec3(-5.0f, 0.0f, -15.0f),2         , Vec3(.3, .5, .8), 0.1),
                      new Sphere(Vec3(-2.0f, -1.0f, -10.0f),1        , Vec3(.1, .1, .1), 0.1, 0.8)];
     scene.lights = [ new Light(Vec3(-10, 20, 30), Vec3(2, 2, 2)) ];
 

@@ -6,7 +6,7 @@ import std.datetime;
 import std.stdio;
 import std.conv;
 import std.string;
-import derelict.sdl.sdl;
+import derelict.sdl2.sdl;
 
 immutable width     = 1280;
 immutable height    = 720;
@@ -149,12 +149,12 @@ public:
         return m_transparency;
     }
 protected:
-    Vec3            m_center;
-    float           m_radius;
-    Vec3            m_color;
-    float           m_reflection;
-    float           m_transparency;
-    bool            m_checkerBoard;
+    Vec3  m_center;
+    float m_radius;
+    Vec3  m_color;
+    float m_reflection;
+    float m_transparency;
+    bool  m_checkerBoard;
 };
 
 class Light
@@ -259,7 +259,7 @@ Vec3 trace (Ray ray, Scene scene, int depth)
         {
             auto GC = normal * sqrt(1 - sin_t2_2);
             auto refraction_direction = GF - GC;
-            auto refraction = trace(Ray(point_of_hit - normal * 1e-4, refraction_direction),
+            auto refraction = trace(Ray(point_of_hit - normal * 1e-5, refraction_direction),
                                     scene, depth + 1);
             color += refraction * (1 - fresneleffect) * obj.transparency();
         }
@@ -267,21 +267,19 @@ Vec3 trace (Ray ray, Scene scene, int depth)
     return color;
 }
 
-void render (Scene scene, SDL_Surface* surface)
+uint[] render (Scene scene, int width, int height)
 {
-    SDL_LockSurface(surface);
-
+    uint[] buffer = new uint[width*height];
     immutable eye = Vec3(0);
     float h = tan(cast(float)fov / 360 * 2 * PI / 2) * 2;
     float w = h * width / height;
-
-    foreach (y; parallel(iota(height)))
+    foreach (y; parallel(iota(height))) // line
     {
-        uint* row = cast(uint*)(surface.pixels + surface.pitch * y);
-        foreach (x; 0..width)
+        uint* row = buffer.ptr + width * y;
+        foreach (x; 0..width)   // pixel
         {
             Vec3 pixel = 0.0f;
-            foreach (suby; 0..2)
+            foreach (suby; 0..2) // subpixel
             {
                 foreach (subx; 0..2)
                 {
@@ -294,20 +292,35 @@ void render (Scene scene, SDL_Surface* surface)
                 }
             }
             auto rgb = map!(a => cast(ubyte)min(255, a*0.25*255+0.5))(pixel[]);
-            row[x] = SDL_MapRGB(surface.format, rgb[0], rgb[1], rgb[2]);
+            row[x] = rgb[2] | (rgb[1] << 8) | (rgb[0] << 16);
         }
     }
-    SDL_UnlockSurface(surface);
-    SDL_UpdateRect(surface, 0, 0, 0, 0);
+    return buffer;
 }
 
 int main()
 {
-    DerelictSDL.load();
+    DerelictSDL2.load();
     SDL_Init(SDL_INIT_VIDEO);
-    SDL_Surface* screen = SDL_SetVideoMode(width, height, 32, SDL_SWSURFACE);
-    if (!screen)
-        return 1;
+
+    SDL_Window*   win;
+    SDL_Renderer* ren;
+    SDL_Texture*  tex;
+
+    scope(exit)
+        SDL_Quit();
+
+    if (SDL_CreateWindowAndRenderer(width, height, 0, &win, &ren) < 0)
+    {
+        writefln("%s", SDL_GetError());
+        return -1;
+    }
+    tex = SDL_CreateTexture(ren, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, width, height);
+    if (!tex)
+    {
+        writefln("%s", SDL_GetError());
+        return -1;
+    }
 
     Scene scene;
     scene.objects = [new Sphere(Vec3(0.0f, -10002.0f, -20.0f), 10000, Vec3(.8, .8, .8), 0.0, 0.0, true),
@@ -318,9 +331,13 @@ int main()
     scene.lights = [ new Light(Vec3(-10, 20, 30), Vec3(2, 2, 2)) ];
 
     auto start = Clock.currTime();
-    render(scene, screen);
+    uint[] buffer = render(scene, width, height);
     auto elapsed = Clock.currTime() - start;
     writefln("%s", elapsed);
+
+    SDL_UpdateTexture(tex, null, buffer, width * uint.sizeof);
+    SDL_RenderCopy(ren, tex, null, null);
+    SDL_RenderPresent(ren);
 
     SDL_Event event;
     while (SDL_WaitEvent(&event))
@@ -337,6 +354,5 @@ int main()
             break;
         }
     }
-
     return 0;
 }
